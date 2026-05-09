@@ -555,15 +555,15 @@ async def admin_update_booking(bid: str, payload: BookingStatusUpdate, _: dict =
 @api.get("/admin/customers")
 async def admin_customers(_: dict = Depends(get_admin)):
     rows = await db.users.find({"role": "customer"}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
-    # add order counts
+    # Single aggregation: group orders by user_id once, then merge into rows.
+    agg = await db.orders.aggregate([
+        {"$group": {"_id": "$user_id", "orders_count": {"$sum": 1}, "lifetime_value": {"$sum": "$total"}}}
+    ]).to_list(None)
+    by_user = {a["_id"]: a for a in agg}
     for r in rows:
-        cnt = await db.orders.count_documents({"user_id": r["id"]})
-        agg = await db.orders.aggregate([
-            {"$match": {"user_id": r["id"]}},
-            {"$group": {"_id": None, "sum": {"$sum": "$total"}}},
-        ]).to_list(1)
-        r["orders_count"] = cnt
-        r["lifetime_value"] = agg[0]["sum"] if agg else 0
+        a = by_user.get(r["id"]) or {}
+        r["orders_count"] = a.get("orders_count", 0)
+        r["lifetime_value"] = a.get("lifetime_value", 0)
     return {"customers": rows}
 
 
