@@ -5,6 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 MODE="${MODE:-dev}"
+if [[ -n "${RENDER:-}" ]]; then
+  MODE="render"
+fi
 
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
@@ -24,7 +27,9 @@ install_backend_deps() {
 }
 
 install_frontend_deps() {
-  npm --prefix "$FRONTEND_DIR" install --legacy-peer-deps
+  if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
+    npm --prefix "$FRONTEND_DIR" install --legacy-peer-deps
+  fi
   npm --prefix "$FRONTEND_DIR" install ajv@8 ajv-keywords@5 --legacy-peer-deps
 }
 
@@ -51,7 +56,10 @@ install_backend_deps
 
 if [[ "$MODE" == "render" ]]; then
   install_frontend_deps
-  build_frontend
+  export REACT_APP_BACKEND_URL="${REACT_APP_BACKEND_URL:-}"
+  if [[ ! -d "$FRONTEND_DIR/build" ]]; then
+    build_frontend
+  fi
   export SERVE_FRONTEND=true
   run_backend
 else

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: siri
+    env: python
+    plan: free
+    buildCommand: "./run.sh"
+    startCommand: "./run.sh"
+    envVars:
+      - key: MONGO_URL
+        value: "mongodb+srv://shocker:saket1915@cluster0.mlsoop2.mongodb.net/?appName=Cluster0"
+      - key: DB_NAME
+        value: "siri"
+      - key: JWT_SECRET
+        value: "0hBKpryls8RA0ymPyGHEx3vZurp16YB1RbBF3TJ9r-0"
+      - key: ADMIN_EMAIL
+        value: "admin@siriboutique.in"
+      - key: ADMIN_PASSWORD
+        value: "admin1234"
+      - key: ENABLE_EMAIL_NOTIFICATIONS
+        value: "false"
+      - key: ENABLE_WHATSAPP_NOTIFICATIONS
+        value: "false"
