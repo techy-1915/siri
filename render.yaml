@@ -6,6 +6,10 @@ services:
     buildCommand: "MODE=render-build ./run.sh"
     startCommand: "MODE=render ./run.sh"
     envVars:
+      - key: NODE_VERSION
+        value: "20.11.1"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: MONGO_URL
         value: "mongodb+srv://shocker:saket1915@cluster0.mlsoop2.mongodb.net/?appName=Cluster0"
       - key: DB_NAME
