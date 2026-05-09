@@ -14,6 +14,7 @@ import bcrypt
 import jwt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, UploadFile, File, Query, BackgroundTasks
 from fastapi.responses import Response as FastAPIResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
@@ -876,3 +877,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve the built frontend when enabled (useful for single-service deploys).
+if os.environ.get("SERVE_FRONTEND", "false").lower() == "true":
+    frontend_build = ROOT_DIR.parent / "frontend" / "build"
+    if frontend_build.exists():
+        app.mount("/", StaticFiles(directory=str(frontend_build), html=True), name="frontend")
+    else:
+        logger.warning("SERVE_FRONTEND=true but frontend build not found at %s", frontend_build)
