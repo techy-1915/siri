@@ -56,8 +56,7 @@ export default function AdminProducts() {
 
   return (
     <div data-testid="admin-products">
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
-        <div className="eyebrow">{products.length} products</div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>        <div className="eyebrow">{products.length} products</div>
         <button className="btn btn-primary sm" onClick={startCreate} data-testid="new-product-btn"><I.plus/> New product</button>
       </div>
 
@@ -175,7 +174,7 @@ export default function AdminProducts() {
 }
 
 function fileToDataUrl(file) {
-  // legacy fallback (unused after object-storage upload)
+  // legacy helper retained for potential offline fallback (unused with object storage)
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);
@@ -183,3 +182,5 @@ function fileToDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
+// eslint-disable-next-line no-unused-vars
+const _legacy = fileToDataUrl;

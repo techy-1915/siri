@@ -18,6 +18,15 @@ Customer flow: browse catalog → product (size chart + custom measurements) →
 
 ## What's been implemented (May 2026)
 
+### Pass A enhancements (May 9)
+- [x] **Object storage migration** — admin product image uploads now go to Emergent object storage (`/api/admin/uploads` → `/api/files/{path}`) with graceful base64 fallback if storage is offline; UI image refs resolve `/api/files/...` against `REACT_APP_BACKEND_URL`
+- [x] **Wishlist** — heart toggle on every product card, persisted server-side per user (collection `wishlist`); count badge in nav; `Wishlist` tab on `/account` with full ProductCard grid
+- [x] **Customer reviews** — 1–5 star ratings + body + optional title; verified-buyer chip auto-attached when reviewer has placed an order containing the product; lives at the bottom of every product detail page
+- [x] **Low-stock alerts** — admin dashboard panel showing all products with `stock <= LOW_STOCK_THRESHOLD` (default 3); orders auto-decrement stock with oversell guard (`{stock: {$gte: qty}}`)
+- [x] **Notifications (feature-flagged)** — `notify_service.py` wraps Resend (email) + Twilio (WhatsApp). Order placement and status updates fire fire-and-forget background tasks. If keys are missing, helpers log and return False — orders never fail. Resend/Twilio keys go in `.env`: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`
+- [x] Fixed Stagger animation that wasn't rendering grids (Home Spring edit, Shop, Tailoring services) — switched from `whileInView` to `animate`
+- [x] Spring 12 product seed sample re-loads on a fresh DB
+
 ### Customer storefront
 - [x] Hero with anime.js-style staggered character reveal (`Where style meets perfection`)
 - [x] Marquee specialities strip
@@ -65,8 +74,8 @@ Customer flow: browse catalog → product (size chart + custom measurements) →
 
 ## Test status
 
-- Backend: 38/38 pytest cases — `iteration_1.json`
-- Frontend e2e: 100% targeted scenarios (auth, cart, checkout, admin, route guards) — `iteration_2.json`, `iteration_3.json`
+- Backend: 56/56 pytest cases (38 base + 18 Pass A) — `iteration_1.json`, `iteration_4.json`
+- Frontend e2e: 100% targeted scenarios (auth, cart, checkout, admin, route guards, wishlist, reviews, uploads, low-stock) — `iteration_2.json`, `iteration_3.json`, `iteration_5.json`
 
 ## Prioritised backlog
 
