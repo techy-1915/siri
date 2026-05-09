@@ -402,12 +402,13 @@ async def place_order(payload: OrderIn, background: BackgroundTasks, user: dict 
     await db.orders.insert_one(order)
     order.pop("_id", None)
 
-    # Decrement stock for each item that maps to a real product
+    # Decrement stock for each item that maps to a real product (oversell-safe)
     for it in items:
         if it.get("product_id"):
+            qty = int(it.get("qty", 1))
             await db.products.update_one(
-                {"id": it["product_id"], "stock": {"$gt": 0}},
-                {"$inc": {"stock": -int(it.get("qty", 1))}},
+                {"id": it["product_id"], "stock": {"$gte": qty}},
+                {"$inc": {"stock": -qty}},
             )
 
     # Fire-and-forget notifications (feature-flagged, never raises)

@@ -1,0 +1,36 @@
+{
+  "summary": "Pass A frontend e2e on the public preview URL — ALL 10 requested flows verified. Home Spring edit grid renders 4 product cards; Shop catalog renders 12 product cards and a click navigates to /shop/{id}; Tailoring & Services renders 10 service cards (>=8 expected); customer nav exposes data-testid='nav-wishlist-btn' with a numeric badge data-testid='nav-wishlist-count' that increments after a heart toggle; logged-out heart click on a ProductCard fires a sonner toast ('Sign in to save favourites') and does NOT add to wishlist; logged-in demo customer (demo@siriboutique.in) hearts product p12, badge becomes 2 (one item from prior seed + p12), and /account?tab=wishlist renders 2 product cards including the just-saved one; product detail page (/shop/p12) renders [data-testid='reviews-section'] with average stars + write-a-review form and submit (rating 5, body, no title) created the review and toast 'Thank you for your review' appeared; admin product image upload via [data-testid='product-image-upload'] uploaded a JPEG to backend object storage, preview src=/api/files/siri-boutique/products/<uuid>.jpg appeared instantly, Save created TEST_UploadProduct (now 13 rows, was 12) and image renders in product list; Admin Dashboard shows [data-testid='low-stock-panel'] with 1 item (Veera Lehenga, 2 left).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProductPage Reviews section", "issues": ["Reviews component renders unconditionally on mount but data fetch can race with quick navigation. First-visit check from a card click occasionally observed the [data-testid='reviews-section'] node not yet in DOM when queried within 500ms after networkidle; subsequent visits always render. Consider adding a lightweight skeleton/placeholder so layout doesn't shift while the GET /products/{id}/reviews is in-flight. Not a functional bug."]},
+      {"screen": "AdminProducts.jsx", "issues": ["Dead helper `fileToDataUrl` (lines 177-185) flagged as 'legacy fallback (unused after object-storage upload)'. Safe to delete to keep the file lean."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pass_a.py",
+    "/app/test_reports/pytest/pass_a_results.xml"
+  ],
+  "action_items": [
+    "(optional) Remove unused fileToDataUrl helper in /app/frontend/src/pages/admin/AdminProducts.jsx",
+    "(optional) Add a small skeleton/loader inside <Reviews/> so the section is in the DOM before the API resolves (purely for first-paint stability; no functional issue today)"
+  ],
+  "critical_code_review_comments": [
+    "WishlistContext.toggle returns a boolean but does not handle 401 from /wishlist/{pid} POST/DELETE — if the cookie/token is silently expired the catch-less await will surface as a console exception and the heart UI will desync with server state. Consider refresh()-on-error fallback.",
+    "ProductCard heart button is nested inside a <Link> wrapper and relies on e.preventDefault()+e.stopPropagation(). Works in tests, but on touch devices the click can still bubble in some browsers — consider rendering the heart as an absolutely positioned sibling outside the <Link> for safety.",
+    "Reviews.jsx submit() does not optimistically prepend the new review and waits for full reload. Fine for now, but on slower connections the user sees the toast before the list updates; could feel inconsistent.",
+    "AdminProducts onFiles uploads files sequentially in a for…of loop — slow for multi-image batches. Could use Promise.all for parallel upload (still serialised by browser HTTP/2, but UX gain on retries).",
+    "AdminDashboard fetches /admin/stats, /admin/orders, /admin/low-stock independently with no loading state for low-stock — minor, but a flicker is visible on slow networks before the panel renders.",
+    "CustomerNav 'nav-wishlist-btn' navigates to /login when logged out instead of allowing the heart-toggle path to drive sign-in flow — consistent with current spec but worth confirming product intent (could push deep link via ?next=/account?tab=wishlist).",
+    "AccountPage useEffect re-fetches /wishlist on every tab change, not only when entering the wishlist tab. Negligible cost but unnecessary."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (10/10 flows)"},
+  "test_credentials": "Admin admin@siriboutique.in / SiriAdmin@2026 ✓ (admin login redirects to /admin), Demo demo@siriboutique.in / demo1234 ✓ (login redirects to /).",
+  "seed_data_creation": "Wish-listed p12 (Anaara Lehenga) under demo customer (now 2 items in wishlist incl. one pre-existing). Created one review on p12 (rating 5, body 'Lovely fabric and beautiful drape...— TEST'). Created admin product 'TEST_UploadProduct' priced ₹1234 with one uploaded JPEG image stored at /api/files/siri-boutique/products/7222091adc644c87ab03a466d91efef6.jpg. Admin product count is now 13 (was 12).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All Pass A frontend flows are GREEN on https://custom-stitch-hub-3.preview.emergentagent.com. data-testids confirmed present and stable: nav-wishlist-btn, nav-wishlist-count, wishlist-toggle-{pid}, product-card-{pid}, reviews-section, rating-star-1..5, review-title-input, review-body-input, submit-review-btn, review-{id}, product-image-upload, product-modal, save-product-btn, low-stock-panel, low-stock-{pid}. Seed data left behind: TEST_UploadProduct admin row + 1 wishlist item + 1 review for p12 — main agent may want to clear via admin UI or DB cleanup before subsequent test runs. p07 stock is 2 (low-stock list), Veera Lehenga has 2 left as well. No unfixed bugs blocking sign-off."
+}
