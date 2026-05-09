@@ -9,8 +9,8 @@ export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
   const [openId, setOpenId] = useState(null);
 
-  const load = () => api.get("/admin/bookings").then((r) => setBookings(r.data.bookings));
-  useEffect(load, []);
+  const load = () => { api.get("/admin/bookings").then((r) => setBookings(r.data.bookings)); };
+  useEffect(() => { load(); }, []);
 
   const advance = async (id, status) => {
     await api.put(`/admin/bookings/${id}/status`, { status });

@@ -11,8 +11,8 @@ export default function AdminOrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
 
-  const load = () => api.get(`/orders/${id}`).then((r) => setOrder(r.data.order));
-  useEffect(load, [id]);
+  const load = () => { api.get(`/orders/${id}`).then((r) => setOrder(r.data.order)); };
+  useEffect(() => { load(); }, [id]);
 
   if (!order) return <p>Loading…</p>;
 

@@ -267,7 +267,7 @@ async def me(user: dict = Depends(get_current_user)):
 
 @api.put("/auth/measurements")
 async def save_measurements(payload: MeasurementsIn, user: dict = Depends(get_current_user)):
-    m = payload.model_dump(exclude_none=False)
+    m = {**(user.get("measurements") or {}), **payload.model_dump(exclude_none=True)}
     await db.users.update_one({"id": user["id"]}, {"$set": {"measurements": m, "measurements_saved_at": now_iso()}})
     return {"ok": True, "measurements": m}
 
@@ -360,7 +360,7 @@ async def place_order(payload: OrderIn, user: dict = Depends(get_current_user)):
     shipping = 0 if subtotal >= 5000 else 149
     tax = round((subtotal + custom_charge - discount) * 0.05, 2)  # 5% GST
     total = round(subtotal + custom_charge - discount + shipping + tax, 2)
-    order_id = "SR-" + str(20000 + int(datetime.now().timestamp()) % 80000)
+    order_id = "SR-" + str(20000 + int(datetime.now().timestamp()) % 80000) + "-" + uuid.uuid4().hex[:4].upper()
     has_custom = any(it.get("custom") for it in items)
     order = {
         "id": order_id,

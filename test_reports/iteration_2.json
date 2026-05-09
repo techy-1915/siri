@@ -1,0 +1,35 @@
+{
+  "summary": "Frontend e2e for Siri Boutique. Customer flows (home, shop, product detail, cart+coupon SIRI10, login, services, booking, measurements modal, in-app navigation) all PASS. Admin flows (admin login, dashboard with 4 KPIs + 12-day chart, orders/bookings/products/customers/coupons/reports SPA navigation, new product create, coupon create, order-detail advance-status visible) all PASS after fixing a critical React useEffect cleanup bug. Two real bugs found: (1) FIXED inline — `useEffect(load, [...])` where load returned a Promise caused 'destroy is not a function' overlay error and broke admin nav after the first switch. Patched 3 files. (2) NOT FIXED — auth-protected routes (/admin/*, /account, /checkout) redirect to /login on hard refresh because route guards check `user` before AuthContext finishes its initial `/auth/me` call. Pages must wait for `loading=false` before redirecting.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminBookings / AdminCoupons / AdminOrderDetail", "issue": "useEffect(load, deps) where load returned a Promise → React threw 'destroy is not a function' on unmount, blocking SPA nav between admin pages after the first switch. Confirmed via runtime-error overlay screenshot.", "selector": "[data-testid=\"adm-nav-bookings\"] etc.", "priority": "CRITICAL (FIXED by testing agent — wrapped load() in arrow fn so useEffect returns undefined)"},
+      {"component": "AdminLayout / CheckoutPage / AccountPage route guards", "issue": "On hard refresh of any auth-protected route (/admin, /admin/orders, /account, /checkout) the page bounces to /login or /admin/login because the guard reads `user` from AuthContext before the initial /auth/me call completes. AuthContext exposes `loading` but pages don't consume it. Reproduced: login → goto /account directly → tabs=0, url=/login.", "selector": "n/a", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Make every auth-aware page (AdminLayout, CheckoutPage, AccountPage, anywhere `useAuth().user` is gated) wait for `loading === false` before redirecting. Simplest fix in AdminLayout: `if (loading) return null; if (!user) navigate('/admin/login'); ...`. Same pattern in Checkout and Account.",
+    "OPTIONAL: prefer `useEffect(() => { load(); }, deps)` consistently across the codebase to avoid Promise-returning effects (already audited 4 admin files; fixed 3, AdminOrders.jsx and AdminProducts.jsx are already safe).",
+    "OPTIONAL: LoginPage should honour `?next=...` query param so /checkout-while-logged-out → /login → returns to /checkout."
+  ],
+  "critical_code_review_comments": [
+    "useEffect(load, deps) is a footgun whenever `load` is `() => api.get(...).then(...)` — that arrow returns the Promise. React calls the return value as a destructor → crash. Fixed in AdminBookings/AdminCoupons/AdminOrderDetail.",
+    "Route guards (`useEffect(() => { if (!user) navigate('/login') })`) fire during AuthContext's initial loading window. Always gate on the explicit `loading` flag the context already exposes, otherwise hard refresh + deep-linking are broken.",
+    "BackButton renders only when window.history.length > 1 — works in SPA after one navigation but the user may not see it on a fresh tab. Acceptable trade-off."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/admin/AdminBookings.jsx",
+    "/app/frontend/src/pages/admin/AdminCoupons.jsx",
+    "/app/frontend/src/pages/admin/AdminOrderDetail.jsx"
+  ],
+  "success_rate": {"backend": "100% (prior iteration)", "frontend": "~92% — every functional test passes via SPA nav; only direct-URL/refresh on auth-protected routes fails"},
+  "test_credentials": "Admin admin@siriboutique.in / SiriAdmin@2026 ✓ ; Demo demo@siriboutique.in / demo1234 ✓",
+  "seed_data_creation": "Created via UI: 1 product 'TEST UI Product' (price 9999), 1 coupon 'TESTC2412' — both visible in admin lists. Demo customer also placed test orders during checkout exploration. Cleanup not performed (admin can delete via UI).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After main agent gates route guards on `loading`, retest: hard-reload /admin/orders, /account, /checkout while logged in. Also verify LoginPage `?next=` redirect. The useEffect Promise bug fix has been applied — do not revert. Selectors confirmed working: brand-link, nav-{home|shop|tailoring-services|atelier|visit}, back-btn, product-card-{id}, sort-select, cat-{slug}, size-{s}, size-custom, color-{cid}, fabric-{fid}, add-to-bag-btn, qty-increment, qty-decrement, size-chart-btn, measurements-modal/-save-btn/-cancel-btn, cart-item-{idx}, cart-qty-inc/dec-{idx}, cart-remove-{idx}, coupon-input, apply-coupon-btn, checkout-btn, login-{email|password|submit-btn}, admin-login-{email|password|submit-btn}, adm-nav-{label}, admin-{dashboard|orders|bookings|products|customers|coupons|reports}, kpi-{slug}, status-filter-{s}, order-row-{id}, advance-status-btn, new-product-btn, product-modal, product-{name|style|price|stock|description}-input, save-product-btn, edit/delete-product-{id}, coupon-code, coupon-desc, create-coupon-btn, customer-{id}, service-{id}, booking-{name|phone|when|notes|address}, pickup-rapido/store, booking-unit-cm/in, confirm-booking-btn, tab-{id}, addr-{name|phone|line1|line2|city|state|pincode}, continue-payment-btn, pay-{cod|online}, continue-review-btn, place-order-btn, order-confirmation, order-id.",
+  "rca_of_the_issue": "Bug 1 (FIXED): The pattern `const load = () => api.get('/...').then(r => setX(r.data))` is an arrow with implicit return → returns a Promise. `useEffect(load, deps)` then receives a Promise as the effect's return value. React 18+ calls that return value as a cleanup function on unmount, but a Promise has no .call signature → 'TypeError: destroy is not a function'. The dev overlay caught it; in prod it would silently break navigation. Fix: wrap in `useEffect(() => { load(); }, deps)` so React gets undefined back. Reproduction: log into admin → click any sub-nav → click another sub-nav → red overlay appears, subsequent nav buttons stop responding. Fixed in 3 files. Bug 2 (REPORTED): Route-guard effects compare against AuthContext.user without considering AuthContext.loading; for the ~200 ms while /auth/me is in flight, user is null → navigate('/login'). Fix is one extra check: `const { user, loading } = useAuth(); if (loading) return null; ...`."
+}

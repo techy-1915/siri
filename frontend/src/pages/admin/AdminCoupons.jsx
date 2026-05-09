@@ -10,8 +10,8 @@ export default function AdminCoupons() {
   const [coupons, setCoupons] = useState([]);
   const [form, setForm] = useState(EMPTY);
 
-  const load = () => api.get("/admin/coupons").then((r) => setCoupons(r.data.coupons));
-  useEffect(load, []);
+  const load = () => { api.get("/admin/coupons").then((r) => setCoupons(r.data.coupons)); };
+  useEffect(() => { load(); }, []);
 
   const create = async () => {
     if (!form.code || !form.value) return;
