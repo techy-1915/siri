@@ -54,6 +54,13 @@ build_frontend() {
 
 install_backend_deps
 
+if [[ "$MODE" == "render-build" ]]; then
+  install_frontend_deps
+  export REACT_APP_BACKEND_URL="${REACT_APP_BACKEND_URL:-}"
+  build_frontend
+  exit 0
+fi
+
 if [[ "$MODE" == "render" ]]; then
   install_frontend_deps
   export REACT_APP_BACKEND_URL="${REACT_APP_BACKEND_URL:-}"
