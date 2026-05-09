@@ -9,14 +9,14 @@ import { toast } from "sonner";
 
 export default function CheckoutPage() {
   const { items, subtotal, clear } = useCart();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [addr, setAddr] = useState({ full_name: user?.name || "", phone: user?.phone || "", line1: "", line2: "", city: "Hyderabad", state: "Telangana", pincode: "" });
   const [pay, setPay] = useState("cod");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { if (!user) navigate("/login?next=/checkout"); }, [user, navigate]);
+  useEffect(() => { if (!loading && !user) navigate("/login?next=/checkout"); }, [user, loading, navigate]);
   useEffect(() => { if (items.length === 0) navigate("/cart"); }, [items.length, navigate]);
 
   const customCharge = items.filter((i) => i.custom).reduce((a, b) => a + 800 * b.qty, 0);

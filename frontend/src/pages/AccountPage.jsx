@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { I } from "../lib/icons";
 
 export default function AccountPage() {
-  const { user, logout, saveMeasurements } = useAuth();
+  const { user, loading, logout, saveMeasurements } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "orders";
@@ -15,7 +15,7 @@ export default function AccountPage() {
   const [bookings, setBookings] = useState([]);
   const [m, setM] = useState({});
 
-  useEffect(() => { if (!user) navigate("/login"); }, [user, navigate]);
+  useEffect(() => { if (!loading && !user) navigate("/login?next=/account"); }, [user, loading, navigate]);
 
   useEffect(() => {
     if (!user) return;

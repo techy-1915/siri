@@ -11,7 +11,7 @@ export default function ServiceBookingPage() {
   const { id } = useParams();
   const loc = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [service, setService] = useState(loc.state?.service || null);
 
   const [mode, setMode] = useState("rapido");
@@ -23,8 +23,8 @@ export default function ServiceBookingPage() {
   const [m, setM] = useState({ unit: "in", ...((user?.measurements) || {}) });
 
   useEffect(() => {
-    if (!user) navigate("/login?next=" + encodeURIComponent(`/services/book/${id}`));
-  }, [user, navigate, id]);
+    if (!loading && !user) navigate("/login?next=" + encodeURIComponent(`/services/book/${id}`));
+  }, [user, loading, navigate, id]);
 
   useEffect(() => {
     if (!service) {

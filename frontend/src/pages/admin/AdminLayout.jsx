@@ -6,14 +6,15 @@ import api from "../../lib/api";
 import BackButton from "../../components/BackButton";
 
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const loc = useLocation();
   const [counts, setCounts] = useState({ orders: 0, bookings: 0, products: 0, customers: 0 });
 
   useEffect(() => {
+    if (loading) return;
     if (!user) navigate("/admin/login"); else if (user.role !== "admin") navigate("/");
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     if (!user || user.role !== "admin") return;
@@ -27,6 +28,7 @@ export default function AdminLayout() {
     }).catch(() => {});
   }, [user, loc.pathname]);
 
+  if (loading) return <div style={{ padding: 80, textAlign: "center", color: "var(--ink-2)" }}>Loading…</div>;
   if (!user || user.role !== "admin") return null;
 
   const NavItem = ({ to, icon, label, count }) => (
