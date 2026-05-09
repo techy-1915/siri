@@ -5,12 +5,14 @@ import { BRAND } from "../lib/constants";
 import BackButton from "./BackButton";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { useWishlist } from "../context/WishlistContext";
 
 export default function CustomerNav() {
   const navigate = useNavigate();
   const loc = useLocation();
   const { count } = useCart();
   const { user } = useAuth();
+  const wish = useWishlist();
 
   const links = [
     { to: "/", label: "Home" },
@@ -45,6 +47,10 @@ export default function CustomerNav() {
       <div className="nav-actions">
         <a href={`tel:${BRAND.phone}`} className="phone-link" data-testid="nav-phone">{BRAND.phoneFmt}</a>
         <button className="icon-btn" onClick={() => navigate("/shop")} data-testid="nav-search-btn"><I.search/></button>
+        <button className="icon-btn" onClick={() => navigate(user ? "/account?tab=wishlist" : "/login")} data-testid="nav-wishlist-btn">
+          <I.heart/>
+          {wish && wish.count > 0 && <span className="badge" data-testid="nav-wishlist-count">{wish.count}</span>}
+        </button>
         <button className="icon-btn" onClick={() => navigate(user ? "/account" : "/login")} data-testid="nav-user-btn"><I.user/></button>
         <button className="icon-btn" onClick={() => navigate("/cart")} data-testid="nav-cart-btn">
           <I.bag/>

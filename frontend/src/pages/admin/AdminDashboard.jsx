@@ -2,14 +2,18 @@ import React, { useEffect, useState } from "react";
 import api from "../../lib/api";
 import { inr } from "../../lib/constants";
 import { Reveal, Stagger, StaggerItem } from "../../components/anim";
+import { Placeholder } from "../../lib/icons";
+import { Link } from "react-router-dom";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
 
   useEffect(() => {
     api.get("/admin/stats").then((r) => setStats(r.data));
     api.get("/admin/orders").then((r) => setOrders(r.data.orders.slice(0, 6)));
+    api.get("/admin/low-stock").then((r) => setLowStock(r.data.products));
   }, []);
 
   if (!stats) return <p style={{ color: "var(--ink-2)" }}>Loading…</p>;
@@ -85,6 +89,33 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+
+      {lowStock.length > 0 && (
+        <div className="panel" style={{ marginTop: 16 }} data-testid="low-stock-panel">
+          <div className="panel-h">
+            <h3>Low stock alerts</h3>
+            <span className="chip wine">{lowStock.length} item{lowStock.length === 1 ? "" : "s"}</span>
+          </div>
+          <table className="adm-table">
+            <thead><tr><th>Image</th><th>Product</th><th>Category</th><th>Stock</th><th className="r">Price</th></tr></thead>
+            <tbody>
+              {lowStock.map((p) => (
+                <tr key={p.id} data-testid={`low-stock-${p.id}`}>
+                  <td style={{ width: 70 }}>
+                    <div style={{ width: 50, height: 50, position: "relative", border: "1px solid var(--hairline)" }}>
+                      <Placeholder image={(p.images && p.images[0]) || null} label={p.name}/>
+                    </div>
+                  </td>
+                  <td><Link to="/admin/products" style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>{p.name}</Link></td>
+                  <td>{p.cat}</td>
+                  <td><span className={`status ${p.stock === 0 ? "return" : "cutting"}`}><span className="dotc"/>{p.stock} left</span></td>
+                  <td className="r">{inr(p.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

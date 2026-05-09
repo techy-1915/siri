@@ -42,8 +42,14 @@ export default function AdminProducts() {
   const onFiles = async (files) => {
     const out = [...(editing.images || [])];
     for (const f of files) {
-      const b64 = await fileToDataUrl(f);
-      out.push(b64);
+      try {
+        const fd = new FormData();
+        fd.append("file", f);
+        const { data } = await api.post("/admin/uploads", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        out.push(data.url);
+      } catch (e) {
+        toast.error(`Upload failed: ${f.name}`);
+      }
     }
     setEditing({ ...editing, images: out });
   };
@@ -169,6 +175,7 @@ export default function AdminProducts() {
 }
 
 function fileToDataUrl(file) {
+  // legacy fallback (unused after object-storage upload)
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result);

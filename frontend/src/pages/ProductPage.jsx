@@ -6,6 +6,7 @@ import { I, Placeholder } from "../lib/icons";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import MeasurementsModal from "../components/MeasurementsModal";
+import Reviews from "../components/Reviews";
 import { toast } from "sonner";
 import { Reveal, Stagger, StaggerItem } from "../components/anim";
 import ProductCard from "../components/ProductCard";
@@ -167,6 +168,7 @@ export default function ProductPage() {
       )}
 
       <MeasurementsModal open={openModal} onClose={() => setOpenModal(false)} onSave={onSaveMeasurements} initial={user?.measurements || {}} title={`Custom fit · ${p.name}`}/>
+      <Reviews productId={p.id}/>
     </div>
   );
 }

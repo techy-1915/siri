@@ -12,10 +12,18 @@ from typing import List, Optional, Dict, Any
 
 import bcrypt
 import jwt
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status, UploadFile, File, Query, BackgroundTasks
+from fastapi.responses import Response as FastAPIResponse
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
+
+from storage_service import put_image, get_image, is_enabled as storage_enabled
+from notify_service import (
+    send_email, send_whatsapp,
+    order_confirmation_email, order_status_email,
+    order_confirmation_whatsapp, order_status_whatsapp,
+)
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -225,6 +233,13 @@ class CouponIn(BaseModel):
     active: bool = True
 
 
+class ReviewIn(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    title: Optional[str] = ""
+    body: str
+    images: List[str] = Field(default_factory=list)
+
+
 # -----------------------------------------------------------------------------
 # Auth endpoints
 # -----------------------------------------------------------------------------
@@ -345,7 +360,7 @@ async def validate_coupon(payload: dict):
 # Orders (customer)
 # -----------------------------------------------------------------------------
 @api.post("/orders")
-async def place_order(payload: OrderIn, user: dict = Depends(get_current_user)):
+async def place_order(payload: OrderIn, background: BackgroundTasks, user: dict = Depends(get_current_user)):
     items = [i.model_dump() for i in payload.items]
     subtotal = sum(it["price"] * it["qty"] for it in items)
     custom_charge = sum(800 for it in items if it.get("custom"))
@@ -386,6 +401,20 @@ async def place_order(payload: OrderIn, user: dict = Depends(get_current_user)):
     }
     await db.orders.insert_one(order)
     order.pop("_id", None)
+
+    # Decrement stock for each item that maps to a real product
+    for it in items:
+        if it.get("product_id"):
+            await db.products.update_one(
+                {"id": it["product_id"], "stock": {"$gt": 0}},
+                {"$inc": {"stock": -int(it.get("qty", 1))}},
+            )
+
+    # Fire-and-forget notifications (feature-flagged, never raises)
+    html, text = order_confirmation_email(order)
+    background.add_task(send_email, user["email"], f"Order {order_id} confirmed · Siri Boutique", html, text)
+    background.add_task(send_whatsapp, payload.address.phone, order_confirmation_whatsapp(order))
+
     return {"order": order}
 
 
@@ -445,18 +474,8 @@ async def admin_stats(_: dict = Depends(get_admin)):
     bookings = await db.bookings.count_documents({})
     pending_bookings = await db.bookings.count_documents({"status": {"$nin": ["delivered", "completed", "cancelled"]}})
 
-    # last 12 months bar data
+    # last 12 days revenue
     now = datetime.now(timezone.utc)
-    months = []
-    for i in range(11, -1, -1):
-        m = (now.month - i - 1) % 12 + 1
-        y = now.year - ((now.month - i - 1) // 12 * -1 if now.month - i <= 0 else 0)
-        if now.month - i <= 0:
-            y = now.year - 1
-        else:
-            y = now.year
-        months.append({"label": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1], "value": 0})
-    # simple last 12 days revenue
     bars = []
     for i in range(11, -1, -1):
         d_start = now - timedelta(days=i+1)
@@ -498,13 +517,20 @@ async def admin_orders(status_filter: Optional[str] = None, _: dict = Depends(ge
 
 
 @api.put("/admin/orders/{oid}/status")
-async def admin_update_status(oid: str, payload: OrderStatusUpdate, _: dict = Depends(get_admin)):
+async def admin_update_status(oid: str, payload: OrderStatusUpdate, background: BackgroundTasks, _: dict = Depends(get_admin)):
     o = await db.orders.find_one({"id": oid})
     if not o:
         raise HTTPException(status_code=404, detail="Order not found")
     history = o.get("history", [])
     history.append({"status": payload.status, "at": now_iso()})
     await db.orders.update_one({"id": oid}, {"$set": {"status": payload.status, "history": history}})
+    o["status"] = payload.status
+    o.pop("_id", None)
+    html, text = order_status_email(o, payload.status)
+    if o.get("email"):
+        background.add_task(send_email, o["email"], f"Order {oid} · {payload.status}", html, text)
+    if o.get("phone"):
+        background.add_task(send_whatsapp, o["phone"], order_status_whatsapp(o, payload.status))
     return {"ok": True}
 
 
@@ -589,6 +615,140 @@ async def admin_delete_coupon(code: str, _: dict = Depends(get_admin)):
 
 
 # -----------------------------------------------------------------------------
+# Image uploads (Emergent object storage with base64 fallback)
+# -----------------------------------------------------------------------------
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+@api.post("/admin/uploads")
+async def admin_upload_image(file: UploadFile = File(...), _: dict = Depends(get_admin)):
+    ct = file.content_type or "application/octet-stream"
+    if ct not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported image type: {ct}")
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image too large (max 8 MB)")
+    ext = (file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg").lower()
+
+    if storage_enabled():
+        path = put_image(data, ct, ext)
+        if path:
+            await db.media.insert_one({
+                "id": str(uuid.uuid4()),
+                "storage_path": path,
+                "filename": file.filename,
+                "content_type": ct,
+                "size": len(data),
+                "is_deleted": False,
+                "created_at": now_iso(),
+            })
+            return {"url": f"/api/files/{path}", "path": path, "kind": "storage"}
+
+    # Fallback: data URL (base64)
+    import base64
+    b64 = base64.b64encode(data).decode("ascii")
+    return {"url": f"data:{ct};base64,{b64}", "kind": "base64"}
+
+
+@api.get("/files/{path:path}")
+async def serve_image(path: str):
+    record = await db.media.find_one({"storage_path": path, "is_deleted": False})
+    res = get_image(path)
+    if not res:
+        raise HTTPException(status_code=404, detail="Image not found")
+    data, ctype = res
+    if record:
+        ctype = record.get("content_type", ctype)
+    return FastAPIResponse(content=data, media_type=ctype, headers={"Cache-Control": "public, max-age=86400"})
+
+
+# -----------------------------------------------------------------------------
+# Wishlist
+# -----------------------------------------------------------------------------
+@api.get("/wishlist")
+async def get_wishlist(user: dict = Depends(get_current_user)):
+    rows = await db.wishlist.find({"user_id": user["id"]}, {"_id": 0}).to_list(500)
+    pids = [r["product_id"] for r in rows]
+    products = await db.products.find({"id": {"$in": pids}}, {"_id": 0}).to_list(500) if pids else []
+    return {"items": products}
+
+
+@api.post("/wishlist/{pid}")
+async def add_wishlist(pid: str, user: dict = Depends(get_current_user)):
+    p = await db.products.find_one({"id": pid})
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await db.wishlist.update_one(
+        {"user_id": user["id"], "product_id": pid},
+        {"$set": {"user_id": user["id"], "product_id": pid, "added_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api.delete("/wishlist/{pid}")
+async def remove_wishlist(pid: str, user: dict = Depends(get_current_user)):
+    await db.wishlist.delete_one({"user_id": user["id"], "product_id": pid})
+    return {"ok": True}
+
+
+# -----------------------------------------------------------------------------
+# Reviews
+# -----------------------------------------------------------------------------
+@api.get("/products/{pid}/reviews")
+async def get_reviews(pid: str):
+    rows = await db.reviews.find({"product_id": pid}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    if rows:
+        avg = sum(r["rating"] for r in rows) / len(rows)
+    else:
+        avg = 0
+    return {"reviews": rows, "count": len(rows), "average": round(avg, 2)}
+
+
+@api.post("/products/{pid}/reviews")
+async def post_review(pid: str, payload: ReviewIn, user: dict = Depends(get_current_user)):
+    p = await db.products.find_one({"id": pid})
+    if not p:
+        raise HTTPException(status_code=404, detail="Product not found")
+    # Verified buyer check
+    placed = await db.orders.count_documents({"user_id": user["id"], "items.product_id": pid})
+    review = {
+        "id": str(uuid.uuid4()),
+        "product_id": pid,
+        "user_id": user["id"],
+        "user_name": user.get("name", "Customer"),
+        "rating": payload.rating,
+        "title": payload.title or "",
+        "body": payload.body,
+        "images": payload.images,
+        "verified_buyer": placed > 0,
+        "created_at": now_iso(),
+    }
+    await db.reviews.insert_one(review)
+    review.pop("_id", None)
+    return {"review": review}
+
+
+@api.delete("/admin/reviews/{rid}")
+async def admin_delete_review(rid: str, _: dict = Depends(get_admin)):
+    await db.reviews.delete_one({"id": rid})
+    return {"ok": True}
+
+
+# -----------------------------------------------------------------------------
+# Low-stock alerts
+# -----------------------------------------------------------------------------
+@api.get("/admin/low-stock")
+async def low_stock(threshold: Optional[int] = None, _: dict = Depends(get_admin)):
+    t = threshold if threshold is not None else int(os.environ.get("LOW_STOCK_THRESHOLD", "3"))
+    rows = await db.products.find(
+        {"stock": {"$lte": t}},
+        {"_id": 0, "id": 1, "name": 1, "cat": 1, "stock": 1, "price": 1, "images": 1},
+    ).sort("stock", 1).to_list(200)
+    return {"threshold": t, "products": rows}
+
+
+# -----------------------------------------------------------------------------
 # Seed data
 # -----------------------------------------------------------------------------
 SERVICES = [
@@ -631,6 +791,16 @@ async def startup():
     await db.orders.create_index("id", unique=True)
     await db.bookings.create_index("id", unique=True)
     await db.coupons.create_index("code", unique=True)
+    await db.wishlist.create_index([("user_id", 1), ("product_id", 1)], unique=True)
+    await db.reviews.create_index([("product_id", 1), ("created_at", -1)])
+    await db.media.create_index("storage_path")
+
+    # Init object storage (best-effort)
+    try:
+        from storage_service import init_storage
+        init_storage()
+    except Exception as e:
+        logger.warning("Storage init skipped: %s", e)
 
     # Seed admin
     admin_email = os.environ["ADMIN_EMAIL"].lower()

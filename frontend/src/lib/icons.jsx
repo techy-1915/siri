@@ -32,7 +32,10 @@ export const I = {
 
 export function Placeholder({ label, hue, image, className = "" }) {
   if (image) {
-    return <img src={image} alt={label || ""} className={className} style={{ width: "100%", height: "100%", objectFit: "cover" }}/>;
+    const src = image.startsWith("/api/")
+      ? `${process.env.REACT_APP_BACKEND_URL || ""}${image}`
+      : image;
+    return <img src={src} alt={label || ""} className={className} style={{ width: "100%", height: "100%", objectFit: "cover" }}/>;
   }
   const style = hue != null
     ? { background: `repeating-linear-gradient(135deg, rgba(39,24,32,0.05) 0 1px, transparent 1px 9px), oklch(0.92 0.02 ${hue})` }

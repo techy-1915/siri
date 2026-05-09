@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import { inr, colorById, fabricById } from "../lib/constants";
+import { inr, colorById, fabricById, resolveImg } from "../lib/constants";
 import { Placeholder, I } from "../lib/icons";
 import api from "../lib/api";
 import { toast } from "sonner";
@@ -45,7 +45,7 @@ export default function CartPage() {
         <h2>Your bag · {count} {count === 1 ? "piece" : "pieces"}</h2>
         {items.map((it, idx) => (
           <div key={idx} className="cart-item" data-testid={`cart-item-${idx}`}>
-            <div className="ph">{it.image ? <img src={it.image} alt={it.name}/> : <Placeholder label={it.name}/>}</div>
+            <div className="ph">{it.image ? <img src={resolveImg(it.image)} alt={it.name}/> : <Placeholder label={it.name}/>}</div>
             <div className="info">
               <div className="name">{it.name}</div>
               <div className="opts">

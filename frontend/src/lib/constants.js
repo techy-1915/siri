@@ -52,5 +52,11 @@ export const MEASUREMENT_FIELDS = [
 
 export const inr = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
+export const resolveImg = (src) => {
+  if (!src) return null;
+  if (src.startsWith("/api/")) return `${process.env.REACT_APP_BACKEND_URL || ""}${src}`;
+  return src;
+};
+
 export const colorById = (id) => COLORS.find((c) => c.id === id) || COLORS[0];
 export const fabricById = (id) => FABRICS.find((f) => f.id === id) || FABRICS[0];

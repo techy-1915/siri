@@ -1,18 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useWishlist } from "../context/WishlistContext";
 import api from "../lib/api";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { inr, MEASUREMENT_FIELDS } from "../lib/constants";
 import { toast } from "sonner";
 import { I } from "../lib/icons";
+import ProductCard from "../components/ProductCard";
+import { Stagger, StaggerItem } from "../components/anim";
 
 export default function AccountPage() {
   const { user, loading, logout, saveMeasurements } = useAuth();
+  const wish = useWishlist();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "orders";
   const [orders, setOrders] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
   const [m, setM] = useState({});
 
   useEffect(() => { if (!loading && !user) navigate("/login?next=/account"); }, [user, loading, navigate]);
@@ -21,8 +26,9 @@ export default function AccountPage() {
     if (!user) return;
     api.get("/orders/me").then((r) => setOrders(r.data.orders));
     api.get("/bookings/me").then((r) => setBookings(r.data.bookings));
+    api.get("/wishlist").then((r) => setWishlist(r.data.items));
     setM({ unit: "in", ...(user.measurements || {}) });
-  }, [user]);
+  }, [user, tab]);
 
   if (!user) return null;
 
@@ -40,10 +46,11 @@ export default function AccountPage() {
         </div>
         <button className="btn btn-ghost" onClick={logout} data-testid="logout-btn">Sign out</button>
       </div>
-      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid var(--hairline)", marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid var(--hairline)", marginBottom: 24, flexWrap: "wrap" }}>
         {[
           { id: "orders", label: "Orders" },
           { id: "bookings", label: "Bookings" },
+          { id: "wishlist", label: `Wishlist${wish && wish.count ? ` · ${wish.count}` : ""}` },
           { id: "measurements", label: "Measurements" },
         ].map((t) => (
           <button key={t.id} onClick={() => setParams({ tab: t.id })}
@@ -95,6 +102,18 @@ export default function AccountPage() {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {tab === "wishlist" && (
+        <div data-testid="wishlist-tab">
+          {wishlist.length === 0 ? (
+            <p style={{ color: "var(--ink-2)" }}>No saved pieces yet. <Link to="/shop" style={{ textDecoration: "underline" }}>Browse the shop →</Link></p>
+          ) : (
+            <Stagger className="product-grid" gap={0.05} style={{ borderTop: "1px solid var(--hairline)", padding: 0 }}>
+              {wishlist.map((p) => <StaggerItem key={p.id}><ProductCard p={p}/></StaggerItem>)}
+            </Stagger>
           )}
         </div>
       )}

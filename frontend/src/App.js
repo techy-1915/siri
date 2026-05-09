@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
+import { WishlistProvider } from "./context/WishlistContext";
 
 import CustomerNav from "./components/CustomerNav";
 import Footer from "./components/Footer";
@@ -93,10 +94,12 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <BrowserRouter>
-          <AnimatedRoutes/>
-          <Toaster position="top-right" richColors theme="light"/>
-        </BrowserRouter>
+        <WishlistProvider>
+          <BrowserRouter>
+            <AnimatedRoutes/>
+            <Toaster position="top-right" richColors theme="light"/>
+          </BrowserRouter>
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   );
