@@ -162,10 +162,11 @@ def order_status_email(order: dict, new_status: str) -> tuple[str, str]:
 
 
 def order_confirmation_whatsapp(order: dict) -> str:
+    base = os.environ.get("APP_URL", "https://siriboutique.in").rstrip("/")
     return (
         f"Siri Boutique 🌿\nOrder {order['id']} confirmed!\n"
         f"Total: ₹{int(order.get('total', 0)):,} ({'COD' if order.get('payment_method') == 'cod' else 'Online'}).\n"
-        f"We'll update you at every step. Track at https://siriboutique.in/order/{order['id']}"
+        f"We'll update you at every step. Track at {base}/order/{order['id']}"
     )
 
 
