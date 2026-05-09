@@ -21,9 +21,8 @@ export function Stagger({ children, gap = 0.06, ...rest }) {
   return (
     <motion.div
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: "-80px" }}
-      variants={{ hidden: {}, show: { transition: { staggerChildren: gap } } }}
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: gap, delayChildren: 0.05 } } }}
       {...rest}
     >
       {children}
